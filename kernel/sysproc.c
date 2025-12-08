@@ -6,6 +6,7 @@
 #include "spinlock.h"
 #include "proc.h"
 
+
 uint64
 sys_exit(void)
 {
@@ -74,7 +75,44 @@ sys_sleep(void)
 int
 sys_pgaccess(void)
 {
-  // lab pgtbl: your code here.
+  struct proc *p = myproc();
+  unsigned int abits=0;
+
+  uint64 addr;
+  argaddr(0, &addr); //Đọc địa chỉ base từ tham số đầu tiên
+  
+  int num;
+  argint(1,&num); //Đọc số trang từ tham số thứ hai
+
+  uint64 dest;
+  argaddr(2, &dest); // Đọc địa chỉ mask từ tham số thứ ba
+    
+  //Duyệt qua từng trang
+  for(int i=0;i<num;i++){
+    uint64 query_addr = addr + i * PGSIZE ; // Địa chỉ ảo của trang thứ i
+
+    //để tìm PTE tương ứng
+    //với địa chỉ ảo query_addr trong Page Table của tiến trình hiện tại.
+    pte_t * pte=walk(p->pagetable, query_addr, 0);  
+
+    // Nếu PTE không tồn tại (NULL) HOẶC PTE chưa hợp lệ, bỏ qua.
+    if (pte == 0 || (*pte & PTE_V) == 0) {
+        continue; 
+    }
+
+    //kiểm tra xem bit PTE_A trong PTE có đang được đặt là 1 hay không
+    //nếu có, trang này đã được truy cập
+    if(*pte&PTE_A)
+    {
+      abits=abits|(1<<i); //Ghi nhận thông tin trang i đã được truy cập vào biến abits
+      *pte=(*pte)&(~PTE_A); //Xóa bit truy cập PTE_A trong PTE để đánh dấu rằng trang đã được truy cập.
+    }
+  }
+
+  //Sao chép nội dung của bitmask abits (được lưu trữ trong kernel space) sang địa chỉ user space là dest.
+  if(copyout(p->pagetable, dest, (char*)&abits, sizeof(abits)) < 0)
+    return -1;
+
   return 0;
 }
 #endif
