@@ -1,0 +1,27 @@
+Q1: Những thanh ghi nào chứa tham số hàm? (Ví dụ: số 13 trong lệnh printf nằm ở đâu?).
+--> a0, a1, a2
+--> Số 13 trong lệnh printf nằm ở thanh ghi a2.
+
+Q2: Lệnh gọi hàm f và g nằm ở đâu trong main?
+--> Không có lệnh gọi (như call hoặc jal) tới hàm f hay g nào xuất hiện trong mã assembly của hàm main (từ địa chỉ 0x1c đến 0x3a).
+    Giải thích:  Lý do lệnh gọi hàm f và g không xuất hiện là vì trình biên dịch đã thực hiện tối ưu hóa:
+        - Constant Folding (Tính toán hằng số): Hàm f và g nhận đầu vào là một hằng số (8). 
+            Trình biên dịch đã tính toán trước kết quả của biểu thức f(8) + 1 (kết quả là 12) ngay trong quá trình biên dịch.
+        - Function Inlining (Nhúng hàm): Nhờ tính toán được kết quả, trình biên dịch đã loại bỏ hoàn toàn lệnh gọi hàm rườm rà.
+            Trình biên dịch nhúng hàm trực tiếp tại lệnh: 
+                        26:	45b1                	li	a1,12
+
+Q3: Địa chỉ của hàm printf là gì?
+--> 0000000000000630 (0x630)
+
+Q4: Giá trị thanh ghi ra (return address) sau khi jalr tới printf là bao nhiêu?
+--> 0000000000000038 (0x38)
+
+Q5: Chạy đoạn code in Hec-xa và String. Output là gì? Nếu là Big-Endian, i phải là bao nhiêu để có output tương tự, có cần thay đổi 57616 thành giá trị khác không?
+--> Output: rld
+--> Nếu là Big-Endian, i phải là: 0x726c6400. Không cần thay đổi giá trị 57616.
+
+Q6: printf("x=%d y=%d", 3); in ra cái gì sau y=? Tại sao?
+--> Giá trị in ra sau "y=" sẽ là một giá trị rác.
+    Giải thích: Hàm printf cần 2 tham số nhưng chỉ truyền 1 (số 3). 
+                Tham số thứ 2 sẽ lấy giá trị rác từ một thanh ghi tham số.
