@@ -1,5 +1,6 @@
 Q1: Những thanh ghi nào chứa tham số hàm? (Ví dụ: số 13 trong lệnh printf nằm ở đâu?).
---> a0, a1, a2
+--> Chuẩn gọi hàm RISC-V sử dụng các thanh ghi a0 đến a7 để truyền tham số.
+--> Cụ thể, trong hàm main ở file call.asm, những thanh ghi chứa tham số hàm là a0, a1, a2.
 --> Số 13 trong lệnh printf nằm ở thanh ghi a2.
 
 Q2: Lệnh gọi hàm f và g nằm ở đâu trong main?
