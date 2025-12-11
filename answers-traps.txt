@@ -19,7 +19,7 @@ Q4: Giá trị thanh ghi ra (return address) sau khi jalr tới printf là bao n
 --> 0000000000000038 (0x38)
 
 Q5: Chạy đoạn code in Hec-xa và String. Output là gì? Nếu là Big-Endian, i phải là bao nhiêu để có output tương tự, có cần thay đổi 57616 thành giá trị khác không?
---> Output: rld
+--> Output: HE110 World
 --> Nếu là Big-Endian, i phải là: 0x726c6400. Không cần thay đổi giá trị 57616.
 
 Q6: printf("x=%d y=%d", 3); in ra cái gì sau y=? Tại sao?
