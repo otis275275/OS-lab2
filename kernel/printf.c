@@ -122,6 +122,9 @@ panic(char *s)
   printf("panic: ");
   printf(s);
   printf("\n");
+
+  backtrace();
+
   panicked = 1; // freeze uart output from other CPUs
   for(;;)
     ;
@@ -132,4 +135,30 @@ printfinit(void)
 {
   initlock(&pr.lock, "pr");
   pr.locking = 1;
+}
+
+void backtrace(void) 
+{
+  uint64 fp = r_fp(); // Bắt đầu từ Frame Pointer hiện tại (s0)
+  uint64 base = PGROUNDDOWN(fp); // Địa chỉ bắt đầu của Kernel Stack Page [cite: 170, 171]
+
+  printf("backtrace:\n");
+
+  // Lặp cho đến khi Frame Pointer nằm ngoài phạm vi Kernel Stack Page hiện tại
+  // (Giả định stack bắt đầu từ base và phát triển lên, không vượt quá base + PGSIZE)
+  // Trong xv6, stack kernel là 1 trang (4096 bytes)
+  while (fp != 0 && fp >= base) {
+    // 1. Địa chỉ trả về (Return Address) nằm ở offset -8 
+    uint64 ra = *(uint64*)(fp - 8);
+    printf("%p\n", ra);
+
+    // 2. Chuyển sang Frame Pointer tiếp theo (của Caller) nằm ở offset -16 
+    fp = *(uint64*)(fp - 16); 
+
+    // Cập nhật Base để kiểm tra điều kiện dừng:
+    // Nếu fp mới nhảy ra khỏi trang hiện tại (lên trang khác), ta dừng lại
+    if (fp < base || fp >= base + PGSIZE) {
+        break; // Dừng nếu FP mới không nằm trong trang stack ban đầu
+    }
+  }
 }
