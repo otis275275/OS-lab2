@@ -1,0 +1,44 @@
+1. Những system call nào khác có thể được tăng tốc bằng trang USYSCALL? Giải thích.
+
+Ngoài getpid(), các system call chỉ đọc thông tin nhỏ và không thay đổi trạng thái của tiến trình đều có thể được tăng tốc bằng cách lưu dữ liệu vào trang USYSCALL. Ví dụ:
+
+- getppid(): PID của tiến trình cha có thể được ghi vào usyscall khi tiến trình được tạo hoặc khi fork(). User chỉ cần đọc trực tiếp từ USYSCALL thay vì trap vào kernel.
+
+- uptime(): kernel có thể ghi biến ticks (thời gian hệ thống) vào trang USYSCALL mỗi lần timer interrupt xảy ra. Nhờ vậy, user đọc thời gian hệ thống trực tiếp mà không cần gọi system call.
+
+Điểm chung: các system call này chỉ trả về dữ liệu read-only, ít thay đổi, nên dùng shared read-only page giúp loại bỏ hoàn toàn chi phí trap vào kernel.
+
+
+2. Đối với mỗi trang lá (leaf page) trong output của vmprint, giải thích trang đó chứa gì và quyền truy cập của nó.
+
+Các trang lá trong page table của tiến trình init thường bao gồm:
+
+(1) Trang mã lệnh (text)
+    - Chứa code của chương trình.
+    - Quyền: PTE_U | PTE_R | PTE_X.
+
+(2) Trang dữ liệu (data)
+    - Chứa biến toàn cục, dữ liệu đã khởi tạo.
+    - Quyền: PTE_U | PTE_R | PTE_W.
+
+(3) Trang heap (được cấp bởi sbrk)
+    - Dùng cho cấp phát động (malloc).
+    - Quyền: PTE_U | PTE_R | PTE_W.
+
+(4) Trang stack của user
+    - Chứa ngăn xếp của tiến trình.
+    - Quyền: PTE_U | PTE_R | PTE_W.
+
+(5) Trang guard của stack
+    - Trang không được gán PTE_U để phát hiện tràn stack.
+    - Không có quyền truy cập từ user.
+
+(6) Trang TRAPFRAME
+    - Lưu các thanh ghi của user mỗi khi xảy ra trap.
+    - Quyền: chỉ PTE_R | PTE_W (không có PTE_U).
+
+(7) Trang USYSCALL
+    - Chứa struct usyscall có PID của tiến trình.
+    - Quyền: PTE_U | PTE_R (user chỉ đọc, không ghi được).
+
+Mỗi trang lá tương ứng với một phần dữ liệu thực tế trong không gian địa chỉ của tiến trình và có quyền truy cập phù hợp với vai trò của nó.
