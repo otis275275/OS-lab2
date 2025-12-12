@@ -1,0 +1,124 @@
+diff --git a/answers-traps.txt b/answers-traps.txt
+new file mode 100644
+index 0000000..d49cfc1
+--- /dev/null
++++ b/answers-traps.txt
+@@ -0,0 +1,28 @@
++Q1: Những thanh ghi nào chứa tham số hàm? (Ví dụ: số 13 trong lệnh printf nằm ở đâu?).
++--> Chuẩn gọi hàm RISC-V sử dụng các thanh ghi a0 đến a7 để truyền tham số.
++--> Cụ thể, trong hàm main ở file call.asm, những thanh ghi chứa tham số hàm là a0, a1, a2.
++--> Số 13 trong lệnh printf nằm ở thanh ghi a2.
++
++Q2: Lệnh gọi hàm f và g nằm ở đâu trong main?
++--> Không có lệnh gọi (như call hoặc jal) tới hàm f hay g nào xuất hiện trong mã assembly của hàm main (từ địa chỉ 0x1c đến 0x3a).
++    Giải thích:  Lý do lệnh gọi hàm f và g không xuất hiện là vì trình biên dịch đã thực hiện tối ưu hóa:
++        - Constant Folding (Tính toán hằng số): Hàm f và g nhận đầu vào là một hằng số (8). 
++            Trình biên dịch đã tính toán trước kết quả của biểu thức f(8) + 1 (kết quả là 12) ngay trong quá trình biên dịch.
++        - Function Inlining (Nhúng hàm): Nhờ tính toán được kết quả, trình biên dịch đã loại bỏ hoàn toàn lệnh gọi hàm rườm rà.
++            Trình biên dịch nhúng hàm trực tiếp tại lệnh: 
++                        26:	45b1                	li	a1,12
++
++Q3: Địa chỉ của hàm printf là gì?
++--> 0000000000000630 (0x630)
++
++Q4: Giá trị thanh ghi ra (return address) sau khi jalr tới printf là bao nhiêu?
++--> 0000000000000038 (0x38)
++
++Q5: Chạy đoạn code in Hec-xa và String. Output là gì? Nếu là Big-Endian, i phải là bao nhiêu để có output tương tự, có cần thay đổi 57616 thành giá trị khác không?
++--> Output: HE110 World
++--> Nếu là Big-Endian, i phải là: 0x726c6400. Không cần thay đổi giá trị 57616.
++
++Q6: printf("x=%d y=%d", 3); in ra cái gì sau y=? Tại sao?
++--> Giá trị in ra sau "y=" sẽ là một giá trị rác.
++    Giải thích: Hàm printf cần 2 tham số nhưng chỉ truyền 1 (số 3). 
++                Tham số thứ 2 sẽ lấy giá trị rác từ một thanh ghi tham số.
+\ No newline at end of file
+diff --git a/kernel/defs.h b/kernel/defs.h
+index a3c962b..4b82fc2 100644
+--- a/kernel/defs.h
++++ b/kernel/defs.h
+@@ -80,6 +80,7 @@ int             pipewrite(struct pipe*, uint64, int);
+ void            printf(char*, ...);
+ void            panic(char*) __attribute__((noreturn));
+ void            printfinit(void);
++void            backtrace(void);
+ 
+ // proc.c
+ int             cpuid(void);
+diff --git a/kernel/printf.c b/kernel/printf.c
+index 1a50203..24741cb 100644
+--- a/kernel/printf.c
++++ b/kernel/printf.c
+@@ -122,6 +122,9 @@ panic(char *s)
+   printf("panic: ");
+   printf(s);
+   printf("\n");
++
++  backtrace();
++
+   panicked = 1; // freeze uart output from other CPUs
+   for(;;)
+     ;
+@@ -133,3 +136,29 @@ printfinit(void)
+   initlock(&pr.lock, "pr");
+   pr.locking = 1;
+ }
++
++void backtrace(void) 
++{
++  uint64 fp = r_fp(); // Bắt đầu từ Frame Pointer hiện tại (s0)
++  uint64 base = PGROUNDDOWN(fp); // Địa chỉ bắt đầu của Kernel Stack Page [cite: 170, 171]
++
++  printf("backtrace:\n");
++
++  // Lặp cho đến khi Frame Pointer nằm ngoài phạm vi Kernel Stack Page hiện tại
++  // (Giả định stack bắt đầu từ base và phát triển lên, không vượt quá base + PGSIZE)
++  // Trong xv6, stack kernel là 1 trang (4096 bytes)
++  while (fp != 0 && fp >= base) {
++    // 1. Địa chỉ trả về (Return Address) nằm ở offset -8 
++    uint64 ra = *(uint64*)(fp - 8);
++    printf("%p\n", ra);
++
++    // 2. Chuyển sang Frame Pointer tiếp theo (của Caller) nằm ở offset -16 
++    fp = *(uint64*)(fp - 16); 
++
++    // Cập nhật Base để kiểm tra điều kiện dừng:
++    // Nếu fp mới nhảy ra khỏi trang hiện tại (lên trang khác), ta dừng lại
++    if (fp < base || fp >= base + PGSIZE) {
++        break; // Dừng nếu FP mới không nằm trong trang stack ban đầu
++    }
++  }
++}
+\ No newline at end of file
+diff --git a/kernel/riscv.h b/kernel/riscv.h
+index 20a01db..5e64fe0 100644
+--- a/kernel/riscv.h
++++ b/kernel/riscv.h
+@@ -1,5 +1,14 @@
+ #ifndef __ASSEMBLER__
+ 
++static inline uint64
++r_fp()
++{
++  uint64 x;
++  // Inline assembly: move content of s0 to variable x
++  asm volatile("mv %0, s0" : "=r" (x));
++  return x;
++}
++
+ // which hart (core) is this?
+ static inline uint64
+ r_mhartid()
+diff --git a/kernel/sysproc.c b/kernel/sysproc.c
+index 3b4d5bd..651a697 100644
+--- a/kernel/sysproc.c
++++ b/kernel/sysproc.c
+@@ -54,6 +54,8 @@ sys_sleep(void)
+   int n;
+   uint ticks0;
+ 
++  backtrace();
++
+   argint(0, &n);
+   if(n < 0)
+     n = 0;
